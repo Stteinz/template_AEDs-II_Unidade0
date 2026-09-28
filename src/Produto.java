@@ -1,11 +1,11 @@
 import java.text.NumberFormat;
 
-public class Produto {
+public abstract class Produto {
 	
 	private static final double MARGEM_PADRAO = 0.2;
-	private String descricao;
-	private double precoCusto;
-	private double margemLucro;
+	protected String descricao;
+	protected double precoCusto;
+	protected double margemLucro;
 	
 	/**
      * Inicializador privado. Os valores default, em caso de erro, são:
@@ -51,9 +51,7 @@ public class Produto {
      * Retorna o valor de venda do produto, considerando seu preço de custo e margem de lucro.
      * @return Valor de venda do produto (double, positivo)
      */
-	public double valorDeVenda() {
-		return (precoCusto * (1.0 + margemLucro));
-	}
+	public abstract double valorDeVenda();
 	
 	/**
      * Descrição, em string, do produto, contendo sua descrição e o valor de venda.
