@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
 import java.nio.charset.StandardCharsets;
+import java.text.NumberFormat;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
@@ -19,6 +20,9 @@ public class AppProdutos {
 	static Produto[] produtosCadastrados;
 	static int quantosProdutos;
 	static boolean dadosCarregados;
+	static Pilha<Pedido> pedidos = new Pilha<Pedido>();
+	static Fila<Pedido> pedidosEmOrdemCadastro = new Fila<Pedido>();
+	static Pedido pedidoAtual = new Pedido();
 
 	static void pausa() {
 		System.out.println("Digite enter para continuar...");
@@ -35,6 +39,12 @@ public class AppProdutos {
 		System.out.println("1 - Listar todos os produtos");
 		System.out.println("2 - Procurar e imprimir os dados de um produto");
 		System.out.println("3 - Cadastrar novo produto");
+		System.out.println("4 - Incluir produto no pedido atual");
+		System.out.println("5 - Finalizar pedido");
+		System.out.println("6 - Listar produtos dos pedidos mais recentes");
+		System.out.println("7 - Exibir o valor total médio dos N primeiros pedidos");
+		System.out.println("8 - Exibir os primeiros pedidos com valor total acima de um determinado valor");
+		System.out.println("9 - Exibir os primeiros pedidos que apresentam um determinado produto");
 		System.out.println("0 - Sair");
 		System.out.print("Digite sua opção: ");
 		try {
@@ -155,6 +165,128 @@ public class AppProdutos {
 		}
 	}
 
+	static void incluirProdutoPedido() {
+		if (quantosProdutos == 0) {
+			System.out.println("Nenhum produto cadastrado.");
+			return;
+		}
+		listarTodosOsProdutos();
+		System.out.print("Digite o número do produto a incluir no pedido: ");
+		try {
+			int numero = Integer.parseInt(teclado.nextLine().trim());
+			if (numero < 1 || numero > quantosProdutos) {
+				System.out.println("Número de produto inválido.");
+				return;
+			}
+			pedidoAtual.adicionarProduto(produtosCadastrados[numero - 1]);
+			System.out.println("Produto incluído no pedido.");
+		} catch (NumberFormatException e) {
+			System.out.println("Número de produto inválido.");
+		}
+	}
+
+	static void finalizarPedido() {
+		if (pedidoAtual.vazio()) {
+			System.out.println("Inclua pelo menos um produto antes de finalizar o pedido.");
+			return;
+		}
+		pedidos.empilhar(pedidoAtual);
+		pedidosEmOrdemCadastro.enfileirar(pedidoAtual);
+		pedidoAtual = new Pedido();
+		System.out.println("Pedido finalizado com sucesso.");
+	}
+
+	static void listarProdutosPedidosRecentes() {
+		if (pedidos.vazia()) {
+			System.out.println("Nenhum pedido cadastrado.");
+			return;
+		}
+		System.out.print("Quantos pedidos recentes deseja consultar? ");
+		try {
+			int numPedidos = Integer.parseInt(teclado.nextLine().trim());
+			Pilha<Pedido> recentes = pedidos.subPilha(numPedidos);
+			int numero = 1;
+			while (!recentes.vazia()) {
+				Pedido pedido = recentes.desempilhar();
+				System.out.println("Pedido recente " + numero++ + ":");
+				for (Produto produto : pedido.getProdutos()) {
+					System.out.println(produto);
+				}
+			}
+		} catch (NumberFormatException e) {
+			System.out.println("Digite uma quantidade inteira de pedidos.");
+		} catch (IllegalArgumentException e) {
+			System.out.println(e.getMessage());
+		}
+	}
+
+	static int lerQuantidadePedidos() {
+		System.out.print("Quantos primeiros pedidos deseja consultar? ");
+		return Integer.parseInt(teclado.nextLine().trim());
+	}
+
+	static void exibirValorMedioPrimeirosPedidos() {
+		if (pedidosEmOrdemCadastro.vazia()) {
+			System.out.println("Nenhum pedido cadastrado.");
+			return;
+		}
+		try {
+			int quantidade = lerQuantidadePedidos();
+			double media = pedidosEmOrdemCadastro.calcularValorMedio(Pedido::valorTotal, quantidade);
+			System.out.println("Valor total médio: " + NumberFormat.getCurrencyInstance().format(media));
+		} catch (NumberFormatException e) {
+			System.out.println("Digite uma quantidade inteira de pedidos.");
+		} catch (IllegalArgumentException | IllegalStateException e) {
+			System.out.println(e.getMessage());
+		}
+	}
+
+	static void exibirPedidosFiltrados(Fila<Pedido> filtrados) {
+		if (filtrados.vazia()) {
+			System.out.println("Nenhum pedido encontrado nos primeiros pedidos consultados.");
+		} else {
+			System.out.print(filtrados);
+		}
+	}
+
+	static void exibirPrimeirosPedidosAcimaValor() {
+		if (pedidosEmOrdemCadastro.vazia()) {
+			System.out.println("Nenhum pedido cadastrado.");
+			return;
+		}
+		try {
+			int quantidade = lerQuantidadePedidos();
+			double valor = lerDouble("Exibir pedidos com valor total acima de: ");
+			if (!Double.isFinite(valor)) {
+				throw new IllegalArgumentException("Informe um valor numérico finito.");
+			}
+			Fila<Pedido> filtrados = pedidosEmOrdemCadastro.filtrar(pedido -> pedido.valorTotal() > valor, quantidade);
+			exibirPedidosFiltrados(filtrados);
+		} catch (NumberFormatException e) {
+			System.out.println("Digite uma quantidade inteira e um valor numérico válidos.");
+		} catch (IllegalArgumentException | IllegalStateException e) {
+			System.out.println(e.getMessage());
+		}
+	}
+
+	static void exibirPrimeirosPedidosComProduto() {
+		if (pedidosEmOrdemCadastro.vazia()) {
+			System.out.println("Nenhum pedido cadastrado.");
+			return;
+		}
+		try {
+			int quantidade = lerQuantidadePedidos();
+			System.out.print("Digite o nome do produto: ");
+			Produto procurado = new ProdutoNaoPerecivel(teclado.nextLine().trim(), 1.0);
+			Fila<Pedido> filtrados = pedidosEmOrdemCadastro.filtrar(pedido -> pedido.contemProduto(procurado), quantidade);
+			exibirPedidosFiltrados(filtrados);
+		} catch (NumberFormatException e) {
+			System.out.println("Digite uma quantidade inteira de pedidos.");
+		} catch (IllegalArgumentException | IllegalStateException e) {
+			System.out.println(e.getMessage());
+		}
+	}
+
 	public static void main(String[] args) {
 		Locale.setDefault(Locale.forLanguageTag("pt-BR"));
 		teclado = new Scanner(System.in, StandardCharsets.UTF_8);
@@ -167,6 +299,12 @@ public class AppProdutos {
 				case 1 -> listarTodosOsProdutos();
 				case 2 -> localizarProduto();
 				case 3 -> cadastrarProduto();
+				case 4 -> incluirProdutoPedido();
+				case 5 -> finalizarPedido();
+				case 6 -> listarProdutosPedidosRecentes();
+				case 7 -> exibirValorMedioPrimeirosPedidos();
+				case 8 -> exibirPrimeirosPedidosAcimaValor();
+				case 9 -> exibirPrimeirosPedidosComProduto();
 				case 0 -> System.out.println("Encerrando.");
 				default -> System.out.println("Opção inválida.");
 			}
